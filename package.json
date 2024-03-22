@@ -9,19 +9,45 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@nechlophomeriaa/spotifydl": "^1.0.12",
+    "@radix-ui/react-checkbox": "^1.0.4",
+    "@radix-ui/react-separator": "^1.0.3",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@types/archiver": "^6.0.2",
+    "@types/fluent-ffmpeg": "^2.1.24",
+    "@types/spotify-web-api-node": "^5.0.11",
+    "archiver": "^7.0.1",
+    "axios": "^1.6.8",
+    "cheerio": "^1.0.0-rc.12",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.1",
+    "fluent-ffmpeg": "^2.1.2",
+    "lucide-react": "^0.359.0",
+    "next": "14.1.4",
+    "node-cache": "^5.1.2",
+    "nodemon": "^3.1.0",
     "react": "^18",
     "react-dom": "^18",
-    "next": "14.1.4"
+    "react-hook-form": "^7.51.1",
+    "shadcn-ui": "^0.8.0",
+    "spotify-web-api-node": "^5.0.2",
+    "tailwind-merge": "^2.2.2",
+    "tailwindcss-animate": "^1.0.7",
+    "yt-get": "^1.1.2",
+    "ytsr": "^3.8.4"
   },
   "devDependencies": {
-    "typescript": "^5",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.1.4",
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
-    "eslint": "^8",
-    "eslint-config-next": "14.1.4"
+    "typescript": "^5"
   }
 }
