@@ -1,4 +1,4 @@
-import ytsr from "ytsr";
+import ytsr, { Item } from "ytsr";
 import { getVideoMP3Base64 } from "yt-get";
 import NodeCache from "node-cache";
 import archiver from "archiver";
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
             name,
             buffer: await base64ToBuffer(base64Cache),
           });
-        const results = await ytsr(name, { limit: 1 });
+        const results = (await ytsr(name, { limit: 1 })) as { items: Item[] };
         const youtubeUrl = results.items[0]?.url;
         const { base64 } = await getVideoMP3Base64(youtubeUrl as string);
         try {
@@ -78,7 +78,9 @@ export async function POST(req: Request) {
   } else {
     const storedBase64 = AudioCache.get(name as string);
     if (storedBase64) return Response.json({ base64: storedBase64 });
-    const results = await ytsr(name as string, { limit: 1 });
+    const results = (await ytsr(name as string, { limit: 1 })) as {
+      items: Item[];
+    };
     const youtubeUrl = results.items[0]?.url;
     const { base64 } = await getVideoMP3Base64(youtubeUrl as string);
     try {
