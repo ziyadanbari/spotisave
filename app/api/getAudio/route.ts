@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     const files: { name: string; buffer: Buffer }[] = [];
     await Promise.all(
       name.map(async (name: string) => {
-        const results = (await ytsr(name, { limit: 1, safeSearch: true })) as {
+        const results = (await ytsr(name, { limit: 1, safeSearch: false })) as {
           items: Video[];
         };
         const youtubeUrl = results.items[0]?.url;
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   } else {
     const results = (await ytsr(name as string, {
       limit: 1,
-      safeSearch: true,
+      safeSearch: false,
     })) as {
       items: Video[];
     };
