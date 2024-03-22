@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     }
     const token = await getToken();
     if (!token) {
-      throw new Error("failed to fetch access_token");
+      return Response.json({ message: "failed to fetch token" });
     }
     spotifyApi.setAccessToken(token);
 
