@@ -3,7 +3,7 @@ import { Button, Input, Navbar } from "@/exports";
 import type { FormValues, SpotifySearchResult, Track } from "@/types";
 import { useForm } from "react-hook-form";
 import axios from "axios";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SpotifyShow from "@/components/SpotifyShow";
 export default function Home() {
   const { register, handleSubmit, watch } = useForm<FormValues>();
@@ -54,7 +54,6 @@ export default function Home() {
       console.log(err);
     }
   };
-
   return (
     <main className="w-full h-full">
       <div className="flex flex-col gap-8">

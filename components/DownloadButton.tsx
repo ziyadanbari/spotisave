@@ -1,7 +1,5 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Button } from "./ui/button";
-import axios from "axios";
-import { base64toBlob } from "@/exports";
 
 export default function DownloadButton({
   playListName,
@@ -13,68 +11,160 @@ export default function DownloadButton({
   text?: string;
 }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(0);
   const downloadSingleAudio = async () => {
-    try {
-      const response = await axios.post<any, any, { name: string | string[] }>(
-        "/api/getAudio",
-        {
-          name,
-        }
-      );
-      const blob = base64toBlob(response.data.base64);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      console.log(error);
+    const response = await fetch(
+      `https://spotisave-ao5b.vercel.app/getMusic?name=${name}`,
+      {
+        method: "get",
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    if (!response.ok || !response.body) {
+      throw response.statusText;
     }
+
+    // Here we start prepping for the streaming response
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalLength = 0;
+    const decoder = new TextDecoder("utf-8");
+
+    while (true) {
+      const { value, done } = await reader.read();
+      console.log(value, done);
+      if (done) {
+        setIsLoading(false);
+        break;
+      }
+      const progressRegex = /progress: (\d+\.\d+)/gi;
+      const decodedChunk = decoder.decode(value, { stream: true });
+      if (progressRegex.test(decodedChunk)) {
+        const match = decodedChunk.match(progressRegex);
+        if (!match) continue;
+        const progress = Number((match.slice(-1)[0].match(/\d+/) || [])[0]);
+        if (!progress || typeof progress !== "number") continue;
+        setProgress(progress);
+      } else {
+        chunks.push(value);
+        totalLength += value.length;
+      }
+    }
+
+    const mergedBuffer = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      mergedBuffer.set(chunk, offset);
+      offset += chunk.length;
+    }
+    const blob = new Blob([mergedBuffer], {
+      type: 'audio/webm; codecs="opus"',
+    });
+
+    // Create a temporary URL for the Blob
+    const url = window.URL.createObjectURL(blob);
+
+    // Create a link element to trigger the download
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${name}.mp3`;
+
+    // Programmatically click the link to start the download
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup: remove the link and revoke the URL
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    setProgress(0);
   };
-  const downloadArchiveAudio = async () => {
+  const downloadPlaylist = async () => {
     try {
-      const response = await axios.post<any, any, { name: string | string[] }>(
-        "/api/getAudio",
+      const response = await fetch(
+        "https://spotisave-ao5b.vercel.app/downloadPlaylist",
         {
-          name,
+          method: "post",
+          headers: {
+            Accept: "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ names: name }),
         }
       );
-      const blob = base64toBlob(
-        response.data.base64_archive,
-        "application/zip"
-      );
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${playListName}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      if (!response.ok || !response.body) {
+        throw response.statusText;
+      }
+
+      // Here we start prepping for the streaming response
+      const reader = response.body.getReader();
+      const chunks = [];
+      let totalLength = 0;
+      const decoder = new TextDecoder("utf-8");
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          setIsLoading(false);
+          break;
+        }
+        const progressRegex = /progress: (\d+\.\d+)/gi;
+        const decodedChunk = decoder.decode(value, { stream: true });
+        if (progressRegex.test(decodedChunk)) {
+          const match = decodedChunk.match(progressRegex);
+          if (!match) continue;
+          const progress = Number((match.slice(-1)[0].match(/\d+/) || [])[0]);
+          if (!progress || typeof progress !== "number") continue;
+          setProgress(progress);
+        } else {
+          chunks.push(value);
+          totalLength += value.length;
+        }
+      }
+
+      const mergedBuffer = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        mergedBuffer.set(chunk, offset);
+        offset += chunk.length;
+      }
+      const blob = new Blob([mergedBuffer], { type: "application/zip" });
+
+      // Create a temporary URL for the Blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a link element to trigger the download
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${playListName}.zip`;
+
+      // Programmatically click the link to start the download
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup: remove the link and revoke the URL
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      console.log(error);
-    }
+      setProgress(0);
+    } catch (error) {}
   };
   return (
     <div>
       <Button
+        style={{
+          backgroundImage: `linear-gradient(to right,hsl(var(--main-green)) ${progress}%, white ${progress}%)`,
+        }}
         className="text-main-green text-center font-semibold"
         size={"lg"}
         onClick={async () => {
-          try {
-            setIsLoading(true);
-            await (playListName
-              ? downloadArchiveAudio()
-              : downloadSingleAudio());
-          } catch (error) {
-          } finally {
-            setIsLoading(false);
-          }
+          setIsLoading(true);
+          await (playListName ? downloadPlaylist() : downloadSingleAudio());
+          setIsLoading(false);
         }}>
-        {isLoading ? (
+        {progress ? (
+          <div className="text-black">{progress}%</div>
+        ) : isLoading ? (
           <span className="loader border-green-main" />
         ) : (
           text || "Download"
