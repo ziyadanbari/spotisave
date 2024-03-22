@@ -1,9 +1,6 @@
 import ytsr, { Item, Video } from "ytsr";
 import { getVideoMP3Base64 } from "yt-get";
-import NodeCache from "node-cache";
 import archiver from "archiver";
-
-const AudioCache = new NodeCache({ stdTTL: 1 * 3600, maxKeys: 20 });
 
 async function base64ToBuffer(base64Data: string): Promise<Buffer> {
   return Buffer.from(base64Data, "base64");
@@ -57,20 +54,11 @@ export async function POST(req: Request) {
     const files: { name: string; buffer: Buffer }[] = [];
     await Promise.all(
       name.map(async (name: string) => {
-        const base64Cache = AudioCache.get(name) as string;
-        if (base64Cache)
-          return files.push({
-            name,
-            buffer: await base64ToBuffer(base64Cache),
-          });
         const results = (await ytsr(name, { limit: 1, safeSearch: true })) as {
           items: Video[];
         };
         const youtubeUrl = results.items[0]?.url;
         const { base64 } = await getVideoMP3Base64(youtubeUrl as string);
-        try {
-          AudioCache.set(name, base64);
-        } catch (error) {}
         files.push({ name, buffer: await base64ToBuffer(base64) });
       })
     );
@@ -78,21 +66,14 @@ export async function POST(req: Request) {
     const base64_archive = zipBuffer.toString("base64");
     return Response.json({ base64_archive });
   } else {
-    const storedBase64 = AudioCache.get(name as string);
-    if (storedBase64) return Response.json({ base64: storedBase64 });
-    console.log(1);
     const results = (await ytsr(name as string, {
       limit: 1,
       safeSearch: true,
     })) as {
       items: Video[];
     };
-    console.log(results);
     const youtubeUrl = results.items[0]?.url;
     const { base64 } = await getVideoMP3Base64(youtubeUrl as string);
-    try {
-      AudioCache.set(name as string, base64);
-    } catch (error) {}
     return Response.json({ base64 });
   }
 }
