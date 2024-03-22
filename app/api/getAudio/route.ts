@@ -63,7 +63,7 @@ export async function POST(req: Request) {
             name,
             buffer: await base64ToBuffer(base64Cache),
           });
-        const results = (await ytsr(name, { limit: 1, safeSearch: false })) as {
+        const results = (await ytsr(name, { limit: 1, safeSearch: true })) as {
           items: Video[];
         };
         const youtubeUrl = results.items[0]?.url;
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     console.log(1);
     const results = (await ytsr(name as string, {
       limit: 1,
-      safeSearch: false,
+      safeSearch: true,
     })) as {
       items: Video[];
     };
