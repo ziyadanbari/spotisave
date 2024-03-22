@@ -36,6 +36,7 @@
     "spotify-web-api-node": "^5.0.2",
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
+    "youtube-sr": "^4.3.10",
     "yt-get": "^1.1.2",
     "ytsr": "^3.8.4"
   },

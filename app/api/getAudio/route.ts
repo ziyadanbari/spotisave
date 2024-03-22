@@ -1,4 +1,4 @@
-import ytsr, { Item, Video } from "ytsr";
+import Youtube from "youtube-sr";
 import { getVideoMP3Base64 } from "yt-get";
 import archiver from "archiver";
 
@@ -54,10 +54,8 @@ export async function POST(req: Request) {
     const files: { name: string; buffer: Buffer }[] = [];
     await Promise.all(
       name.map(async (name: string) => {
-        const results = (await ytsr(name, { limit: 1, safeSearch: false })) as {
-          items: Video[];
-        };
-        const youtubeUrl = results.items[0]?.url;
+        const results = await Youtube.searchOne(name);
+        const youtubeUrl = results.url;
         const { base64 } = await getVideoMP3Base64(youtubeUrl as string);
         files.push({ name, buffer: await base64ToBuffer(base64) });
       })
@@ -66,13 +64,9 @@ export async function POST(req: Request) {
     const base64_archive = zipBuffer.toString("base64");
     return Response.json({ base64_archive });
   } else {
-    const results = (await ytsr(name as string, {
-      limit: 1,
-      safeSearch: false,
-    })) as {
-      items: Video[];
-    };
-    const youtubeUrl = results.items[0]?.url;
+    const results = await Youtube.searchOne(name);
+    const youtubeUrl = results.url;
+    console.log(youtubeUrl);
     const { base64 } = await getVideoMP3Base64(youtubeUrl as string);
     return Response.json({ base64 });
   }
