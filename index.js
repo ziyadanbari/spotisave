@@ -31,7 +31,7 @@ app.get("/getMusic", async (req, res) => {
 
     const audio = ytdl(videoURL, {
       filter: "audioonly",
-      quality: "lowestaudio",
+      quality: "highestaudio",
     });
 
     let downloadedBytes = 0;
@@ -89,7 +89,7 @@ app.post("/downloadPlaylist", async (req, res) => {
   for (let name in urls) {
     const url = urls[name];
     const chunks = [];
-    const audio = ytdl(url, { filter: "audio", quality: "lowestaudio" });
+    const audio = ytdl(url, { filter: "audio", quality: "highestaudio" });
     audio.on("data", (chunk) => {
       chunks.push(chunk);
       downloadedBytes += chunk.length;
