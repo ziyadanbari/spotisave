@@ -19,7 +19,10 @@ app.get("/getMusic", async (req, res) => {
     if (!videoURL) return res.status(400).json({ message: "Music not found" });
     const info = await ytdl.getInfo(videoURL);
     const audioFormat = info.formats.find(
-      (format) => format.hasAudio && !format.hasVideo
+      (format) =>
+        format.hasAudio &&
+        !format.hasVideo &&
+        format.audioQuality === "AUDIO_QUALITY_LOW"
     );
 
     if (!audioFormat) {
@@ -28,7 +31,7 @@ app.get("/getMusic", async (req, res) => {
 
     const audio = ytdl(videoURL, {
       filter: "audioonly",
-      quality: "lowest",
+      quality: "lowestaudio",
     });
 
     let downloadedBytes = 0;
@@ -71,7 +74,10 @@ app.post("/downloadPlaylist", async (req, res) => {
       if (!videoURL) return console.log("url not found");
       const info = await ytdl.getInfo(videoURL);
       const audioFormat = info.formats.find(
-        (format) => format.hasAudio && !format.hasVideo
+        (format) =>
+          format.hasAudio &&
+          !format.hasVideo &&
+          format.audioQuality === "AUDIO_QUALITY_LOW"
       );
       if (!audioFormat) {
         throw new Error("No audio format found");
@@ -83,7 +89,7 @@ app.post("/downloadPlaylist", async (req, res) => {
   for (let name in urls) {
     const url = urls[name];
     const chunks = [];
-    const audio = ytdl(url, { filter: "audio", quality: "lowest" });
+    const audio = ytdl(url, { filter: "audio", quality: "lowestaudio" });
     audio.on("data", (chunk) => {
       chunks.push(chunk);
       downloadedBytes += chunk.length;
