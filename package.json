@@ -15,11 +15,8 @@
     "axios": "^1.6.8",
     "cors": "^2.8.5",
     "express": "^4.19.1",
-    "ffmpeg-installer": "^1.0.2",
     "jszip": "^3.10.1",
-    "sse": "^0.0.8",
-    "youtube-sr": "^4.3.10",
-    "ytdl-core": "^4.11.5"
+    "youtube-sr": "^4.3.10"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
