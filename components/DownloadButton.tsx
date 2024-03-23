@@ -15,7 +15,7 @@ export default function DownloadButton({
   name: string[] | string;
   text?: string;
   avatar?: string;
-  artistName: string;
+  artistName?: string;
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState<number | null>(0);
