@@ -1,10 +1,8 @@
 const express = require("express");
-const ytdl = require("ytdl-core");
 const { default: YouTube } = require("youtube-sr");
 const JSZip = require("jszip");
 const cors = require("cors");
 const { default: axios } = require("axios");
-const { writeSync, writeFileSync } = require("fs");
 const app = express();
 
 app.use(cors());
