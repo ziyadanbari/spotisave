@@ -72,12 +72,7 @@ app.post("/downloadPlaylist", async (req, res) => {
     }
   }
   const zipBuffer = await createZipFromBuffers(totalChunks);
-  const chunkSize = 500 * 1024; // 1MB chunk size
-  for (let i = 0; i < zipBuffer.length; i += chunkSize) {
-    const chunk = zipBuffer.slice(i, i + chunkSize);
-    res.write(chunk);
-  }
-  res.end();
+  res.end(zipBuffer);
 });
 
 async function createZipFromBuffers(musicObject) {
