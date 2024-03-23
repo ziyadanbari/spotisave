@@ -3,13 +3,15 @@ import { Button, Input, Navbar } from "@/exports";
 import type { FormValues, SpotifySearchResult, Track } from "@/types";
 import { useForm } from "react-hook-form";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import SpotifyShow from "@/components/SpotifyShow";
 export default function Home() {
+  const [loading, setLoading] = useState<boolean>(false);
   const { register, handleSubmit, watch } = useForm<FormValues>();
   const [results, setResults] = useState<SpotifySearchResult | null>(null);
   const onSubmit = async (values: FormValues) => {
     try {
+      setLoading(true);
       const response = await axios.post<any, any, FormValues>(
         "/api/getSpotifyLink",
         values
@@ -52,6 +54,8 @@ export default function Home() {
       setResults(metaData);
     } catch (err) {
       console.log(err);
+    } finally {
+      setLoading(false);
     }
   };
   return (
@@ -86,7 +90,13 @@ export default function Home() {
                 </div>
               </form>
               <div className="w-full">
-                {results ? <SpotifyShow results={results} /> : null}
+                {results ? (
+                  <SpotifyShow results={results} />
+                ) : loading ? (
+                  <div className="flex justify-center">
+                    <span className="loader w-14 h-14 border-4 "></span>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

@@ -32,7 +32,11 @@ export default function MusicPaper({
           </div>
         </div>
         <div>
-          <DownloadButton name={`${artistName} ${name}`} />
+          <DownloadButton
+            avatar={avatar}
+            artistName={artistName}
+            name={`${artistName} ${name}`}
+          />
         </div>
       </div>
     </div>

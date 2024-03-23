@@ -7,15 +7,17 @@ import DownloadButton from "./DownloadButton";
 
 export default function SpotifyShow({
   results,
+  skeleton,
 }: {
   results: SpotifySearchResult;
+  skeleton?: boolean;
 }) {
   return (
     <div>
       <div className="flex flex-col gap-8">
         <div className="flex flex-col items-center gap-2">
           <div className="w-64 h-64">
-            {results.avatar ? (
+            {!skeleton ? (
               <img
                 src={results.avatar}
                 className="w-full h-full"

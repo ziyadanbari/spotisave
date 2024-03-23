@@ -7,3 +7,6 @@ export * from "@/components/ui/checkbox";
 export * from "@/components/ui/separator";
 
 export { base64toBlob } from "@/lib/base64ToBlob";
+
+// export const backendUrl: string = "http://localhost:4000";
+export const backendUrl: string = "https://spotisave-ao5b.vercel.app";
