@@ -3,10 +3,18 @@ const ytdl = require("ytdl-core");
 const { default: YouTube } = require("youtube-sr");
 const JSZip = require("jszip");
 const cors = require("cors");
+const { default: axios } = require("axios");
+const { writeSync, writeFileSync } = require("fs");
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+const YOUTUBE_MP3_API = "https://youtube-mp36.p.rapidapi.com/dl";
+const YOUTUBE_API_HEADERS = {
+  "X-RapidAPI-Key": "73cfd2a0ecmshbc5e01564a432abp1d656ajsn2878a3f3e2dc",
+  "X-RapidAPI-Host": "youtube-mp36.p.rapidapi.com",
+};
 
 // Route to stream audio
 app.get("/getMusic", async (req, res) => {
@@ -15,46 +23,14 @@ app.get("/getMusic", async (req, res) => {
     if (!name) return res.status(400).json({ message: "Name missing" });
 
     const result = await YouTube.searchOne(name);
-    const videoURL = result.url;
-    if (!videoURL) return res.status(400).json({ message: "Music not found" });
-    const info = await ytdl.getInfo(videoURL);
-    const audioFormat = info.formats.find(
-      (format) =>
-        format.hasAudio &&
-        !format.hasVideo &&
-        format.audioQuality === "AUDIO_QUALITY_LOW"
-    );
-
-    if (!audioFormat) {
-      throw new Error("No audio format found");
-    }
-
-    const audio = ytdl(videoURL, {
-      filter: "audioonly",
-      quality: "lowestaudio",
-    });
-
-    let downloadedBytes = 0;
-    let totalBytes = parseInt(audioFormat.contentLength);
-    const chunks = [];
-    audio.on("data", (chunk) => {
-      downloadedBytes += chunk.length;
-      const progress = (downloadedBytes / totalBytes) * 100;
-      res.write(`progress: ${progress}`);
-      chunks.push(chunk);
-    });
-
-    audio.on("end", () => {
-      const data = Buffer.concat(chunks);
-      res.write(data);
-      res.end();
-    });
-
-    // Handle errors
-    audio.on("error", (error) => {
-      console.error("Video stream error:", error);
-      res.status(500).end();
-    });
+    const videoId = result.id;
+    if (!videoId) return res.status(400).json({ message: "Music not found" });
+    const { link, filesize } = (
+      await axios.get(`${YOUTUBE_MP3_API}?id=${videoId}`, {
+        headers: { ...YOUTUBE_API_HEADERS },
+      })
+    ).data;
+    return res.status(200).json({ link, filesize });
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -69,46 +45,41 @@ app.post("/downloadPlaylist", async (req, res) => {
   await Promise.all([
     ...names.map(async (name) => {
       const result = await YouTube.searchOne(name);
-      const videoURL = result?.url;
-      urls[name] = videoURL;
-      if (!videoURL) return console.log("url not found");
-      const info = await ytdl.getInfo(videoURL);
-      const audioFormat = info.formats.find(
-        (format) =>
-          format.hasAudio &&
-          !format.hasVideo &&
-          format.audioQuality === "AUDIO_QUALITY_LOW"
-      );
-      if (!audioFormat) {
-        throw new Error("No audio format found");
-      }
-      totalBytes = totalBytes + parseInt(audioFormat.contentLength);
+      const videoID = result?.id;
+      const { link, filesize } = (
+        await axios.get(`${YOUTUBE_MP3_API}?id=${videoID}`, {
+          headers: { ...YOUTUBE_API_HEADERS },
+        })
+      ).data;
+      urls[name] = link;
+      totalBytes = totalBytes + parseInt(filesize);
     }),
   ]);
+  res.write(JSON.stringify({ totalBytes: String(totalBytes) }));
   const totalChunks = {};
   for (let name in urls) {
-    const url = urls[name];
+    const downloadUrl = urls[name];
+    const response = await fetch(downloadUrl);
+    const reader = response.body.getReader();
     const chunks = [];
-    const audio = ytdl(url, { filter: "audio", quality: "lowestaudio" });
-    audio.on("data", (chunk) => {
-      chunks.push(chunk);
-      downloadedBytes += chunk.length;
-      const progress = (downloadedBytes / totalBytes) * 100;
-      console.log(progress);
-      res.write(`progress: ${progress}`);
-    });
-    audio.on("end", () => {
-      totalChunks[name] = chunks;
-      const keys = Object.keys(urls);
-      const isTheLast = keys.indexOf(name) === keys.length - 1;
-      if (isTheLast) {
-        createZipFromBuffers(totalChunks).then((zipBuffer) => {
-          res.write(zipBuffer);
-          res.end();
-        });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        totalChunks[name] = chunks;
+        break;
       }
-    });
+      downloadedBytes += value.length;
+      await sendProgress(res, { downloadedBytes });
+      chunks.push(value);
+    }
   }
+  const zipBuffer = await createZipFromBuffers(totalChunks);
+  const chunkSize = 500 * 1024; // 1MB chunk size
+  for (let i = 0; i < zipBuffer.length; i += chunkSize) {
+    const chunk = zipBuffer.slice(i, i + chunkSize);
+    res.write(chunk);
+  }
+  res.end();
 });
 
 async function createZipFromBuffers(musicObject) {
@@ -122,8 +93,16 @@ async function createZipFromBuffers(musicObject) {
 
   // Generate the zip buffer
   const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-
   return zipBuffer;
+}
+
+async function sendProgress(res, data) {
+  return new Promise((resolve, reject) => {
+    res.write(JSON.stringify(data) + "\n", (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
 }
 
 // Start the Express server
