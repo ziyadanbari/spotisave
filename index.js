@@ -53,9 +53,8 @@ app.get(`/getSong/:musicId`, async (req, res) => {
     res.send(buffer);
     unlinkSync(musicDir);
   } catch (error) {
-    res
-      .status(error[0] || 500)
-      .json({ message: error[1] || "Internal server error" });
+    console.log(error);
+    res.status(error[0] || 500).json({ message: error.toString() });
   }
 });
 
