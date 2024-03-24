@@ -32,6 +32,7 @@ async function downloadMusic(musicId, spotifyUrl, type = "song") {
         path: `./audios/${musicId}.mp3`,
       };
     const command = `node ./lib/spotify-dl/cli.js https://open.spotify.com/${TYPES[type]}/${musicId}`;
+    console.log(command);
     const result = execSync(command);
     return {
       link: `${process.env.BACKEND_URI}/getSong/${musicId}.mp3`,
@@ -65,6 +66,7 @@ app.get("/getMusic", async (req, res) => {
     const { trackId } = req.query;
     if (!trackId)
       return res.status(400).json({ message: "Track id is missing" });
+    console.log(trackId);
     const result = await downloadMusic(trackId);
     return res.status(200).json({ result });
   } catch (error) {
