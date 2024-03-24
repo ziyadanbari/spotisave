@@ -5,6 +5,7 @@ const { existsSync, statSync, readFileSync, unlinkSync } = require("fs");
 const { execSync } = require("child_process");
 const mm = require("music-metadata");
 const app = express();
+require("dotenv").config();
 app.use(cors());
 app.use(express.json());
 
