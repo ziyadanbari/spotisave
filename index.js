@@ -1,5 +1,4 @@
 const express = require("express");
-const { default: YouTube } = require("youtube-sr");
 const JSZip = require("jszip");
 const cors = require("cors");
 const { existsSync, statSync, readFileSync, unlinkSync } = require("fs");
