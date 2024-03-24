@@ -64,8 +64,8 @@ app.get("/getMusic", async (req, res) => {
     const { trackId } = req.query;
     if (!trackId)
       return res.status(400).json({ message: "Track id is missing" });
-    const { link, fileSize } = await downloadMusic(trackId);
-    return res.status(200).json({ link, filesize: fileSize });
+    const result = await downloadMusic(trackId);
+    return res.status(200).json({ result });
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ message: error.toString() });
