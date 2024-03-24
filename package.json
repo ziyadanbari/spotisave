@@ -12,11 +12,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.6.8",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "cors": "^2.8.5",
     "express": "^4.19.1",
+    "fluent-ffmpeg": "^2.1.2",
     "jszip": "^3.10.1",
-    "youtube-sr": "^4.3.10"
+    "music-metadata": "^7.14.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
