@@ -10,12 +10,14 @@ export default function DownloadButton({
   text,
   avatar,
   artistName,
+  id,
 }: {
   playListName?: string;
   name: string[] | string;
   text?: string;
   avatar?: string;
   artistName?: string;
+  id: string | string[] | number;
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState<number | null>(0);
@@ -23,7 +25,7 @@ export default function DownloadButton({
   const downloadSingleAudio = async () => {
     const { link: downloadLink, filesize } = (
       await axios.get<{ link: string; filesize: number }>(
-        `${backendUrl}/getMusic?name=${name}`
+        `${backendUrl}/getMusic?trackId=${id}`
       )
     ).data;
     const total = filesize || 0;
@@ -97,7 +99,7 @@ export default function DownloadButton({
           Accept: "application/json, text/plain, */*",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ names: name }),
+        body: JSON.stringify({ tracksId: id }),
       });
       if (!response.ok || !response.body) {
         throw response.statusText;

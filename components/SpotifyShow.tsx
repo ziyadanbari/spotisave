@@ -35,6 +35,7 @@ export default function SpotifyShow({
         {results.tracks.length > 1 && (
           <div className="flex justify-center">
             <DownloadButton
+              id={results.tracks.map((track) => track.id)}
               playListName={results.name}
               text="Download All"
               name={results.tracks.map(
