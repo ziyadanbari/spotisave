@@ -68,7 +68,7 @@ app.get("/getMusic", async (req, res) => {
     return res.status(200).json({ link, filesize: fileSize });
   } catch (error) {
     console.error("Error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: error.toString() });
   }
 });
 
