@@ -38,7 +38,7 @@ async function downloadMusic(musicId, spotifyUrl, type = "song") {
       path: `./audios/${musicId}.mp3`,
     };
   } catch (error) {
-    console.log(error);
+    throw error;
   }
 }
 
