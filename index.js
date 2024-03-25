@@ -143,7 +143,7 @@ app.post("/downloadPlaylist", async (req, res) => {
       ({ progress }) => {
         res.write(
           JSON.stringify({
-            progress: Math.min(
+            downloadedBytes: Math.min(
               ((downloadedBytes + progress.transferred) / totalBytes) * 100
             ),
           })
