@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { backendUrl } from "@/exports";
-import { ID3Writer } from "browser-id3-writer";
-import axios from "axios";
 
 export default function DownloadButton({
   playListName,
@@ -23,34 +21,42 @@ export default function DownloadButton({
   const [progress, setProgress] = useState<number | null>(0);
 
   const downloadSingleAudio = async () => {
-    const { link: downloadLink, filesize } = (
-      await axios.get<{ link: string; filesize: number }>(
-        `${backendUrl}/getMusic?trackId=${id}`
-      )
-    ).data;
-    const total = filesize || 0;
-    const response = await fetch(downloadLink);
+    const response = await fetch(
+      `${backendUrl}/getMusic?name=${name}&thumbnailUrl=${avatar}`
+    );
+    let totalBytes: number = 0;
+    let progress: number = 0;
     if (!response || !response.body) return;
     const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let totalDownloadedBytes = 0;
+    const decoder = new TextDecoder("utf-8");
+    let mergedBuffer = Buffer.alloc(0);
+    let downloadUrl: string | null = null;
     while (true) {
       const { value, done } = await reader.read();
+      const decodedChunk = decoder.decode(value);
       if (done) {
         setIsLoading(false);
         break;
       }
-      chunks.push(value);
-      totalDownloadedBytes += value.length;
-      const progress = Math.trunc((totalDownloadedBytes / total) * 100);
-      setProgress(progress);
+      extractTotalBytes(decodedChunk) || totalBytes;
+      setProgress(extractDownloadedBytes(decodedChunk) || progress);
+      downloadUrl = extractDownloadUrl(decodedChunk);
+      console.log(downloadUrl);
+      if (downloadUrl) break;
     }
-    const mergedBuffer = new Uint8Array(total);
-    let offset = 0;
-    for (const chunk of chunks) {
-      mergedBuffer.set(chunk, offset);
-      offset += chunk.length;
+    if (!downloadUrl) throw "Music not found";
+    const audioFile = await fetch(downloadUrl);
+    if (!audioFile || !audioFile.body) throw "Something went wrong";
+    const audioReader = audioFile.body.getReader();
+    while (true) {
+      const { value, done } = await audioReader.read();
+      if (done) {
+        setIsLoading(false);
+        break;
+      }
+      mergedBuffer = Buffer.concat([mergedBuffer, Buffer.from(value)]);
     }
+
     const blob = new Blob([mergedBuffer], { type: "audio/mp3" });
     const url = URL.createObjectURL(blob);
 
@@ -78,6 +84,15 @@ export default function DownloadButton({
       return null;
     }
   }
+  function extractDownloadUrl(string: string) {
+    const regex = /"url"\s*:\s*"([^"]+)"/;
+    const match = regex.exec(string);
+    if (match && match[1]) {
+      return match[1];
+    } else {
+      return null;
+    }
+  }
   function extractDownloadedBytes(string: string) {
     const regex = /"downloadedBytes"\s*:\s*(\d+)/;
     const match = string.match(regex);
@@ -99,7 +114,7 @@ export default function DownloadButton({
           Accept: "application/json, text/plain, */*",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ tracksId: id }),
+        body: JSON.stringify({ tracksName: name }),
       });
       if (!response.ok || !response.body) {
         throw response.statusText;
