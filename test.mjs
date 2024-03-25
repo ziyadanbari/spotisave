@@ -1,6 +1,5 @@
 import nodeID3 from "node-id3";
 import fs, { writeFileSync } from "fs";
-import { writeFile } from "fs/promises";
 import sharp from "sharp";
 async function addThumbnailToAudio(audioFile, imageFile, outputFile) {
   try {
@@ -9,13 +8,14 @@ async function addThumbnailToAudio(audioFile, imageFile, outputFile) {
 
     // Read image file
     const imageBuffer = await sharp(imageFile)
+      .toFormat("jpeg")
       .resize(640, 640) // Adjust size as needed
       .toBuffer();
 
     // Set image as thumbnail
     const tags = {
       image: {
-        mime: "image/png",
+        mime: "image/jpeg",
         type: { id: 3 },
         imageBuffer: imageBuffer,
       },
@@ -40,8 +40,8 @@ async function addThumbnailToAudio(audioFile, imageFile, outputFile) {
 }
 
 // Example usage:
-const audioFile = "./6mKrkIikIDiBRC9ZqjbeNl.mp3";
-const imageFile = "./STORMY - POPO (Music Video).jpeg";
+const audioFile = "./audios/Drake Toosie Slide.mp3";
+const imageFile = "./ab67616d0000b273bba7cfaf7c59ff0898acba1f.jpeg";
 const outputFile = "output_with_thumbnail.mp3";
 
 addThumbnailToAudio(audioFile, imageFile, outputFile);

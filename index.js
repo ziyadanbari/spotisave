@@ -33,16 +33,20 @@ async function downloadThumbnail(thumbnailUrl) {
 async function downloadMusic(videoId, filename, progressCb, thumbnailUrl) {
   try {
     console.log(videoId);
+    console.log(thumbnailUrl);
     return new Promise((resolve, reject) => {
       YD.download(videoId, filename);
       if (progressCb) YD.on("progress", progressCb);
       YD.on("finished", async (error, info) => {
+        console.log(info);
         const thumbnailBufferPNG = await downloadThumbnail(
           thumbnailUrl || info.thumbnail
         );
         const thumbnailBufferJPEG = await sharp(thumbnailBufferPNG)
           .toFormat("jpeg")
+          .resize(640, 640)
           .toBuffer();
+        console.log(thumbnailBufferJPEG);
         NodeID3.write(
           {
             image: {
@@ -52,13 +56,17 @@ async function downloadMusic(videoId, filename, progressCb, thumbnailUrl) {
             },
           },
           readFileSync(info.file),
-          (err, buffer) => writeFileSync(info.file, buffer)
+          (err, buffer) => {
+            writeFileSync(info.file, buffer);
+            const fileBuffer = readFileSync(info.file);
+            resolve({
+              buffer: fileBuffer,
+              fileSize: info.stats.transferredBytes,
+              path: info.file,
+              url: `${process.env.BACKEND_URI}/getSong/${info.file.split("/").slice(-1)[0]}`,
+            });
+          }
         );
-        resolve({
-          link: `${process.env.BACKEND_URI}/getSong/${info.file.split("/").slice(-1)[0]}`,
-          fileSize: info.stats.transferredBytes,
-          path: info.file,
-        });
       });
     });
   } catch (error) {
@@ -92,13 +100,16 @@ app.get("/getMusic", async (req, res) => {
     if (!name) return res.status(400).json({ message: "Track id is missing" });
     const search = await YouTube.searchOne(name);
     const trackId = search.id;
-    const { link, fileSize } = await downloadMusic(
+    const { buffer, fileSize, url } = await downloadMusic(
       trackId,
       `${name}.mp3`,
-      null,
+      ({ progress }) => {
+        res.write(JSON.stringify({ totalBytes: `${progress.length}` }));
+        res.write(JSON.stringify({ downloadedBytes: progress.percentage }));
+      },
       thumbnailUrl
     );
-    return res.json({ link, fileSize });
+    return res.end(JSON.stringify({ url }));
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ message: error.toString() });
@@ -126,7 +137,7 @@ app.post("/downloadPlaylist", async (req, res) => {
   res.write(JSON.stringify({ totalBytes: `${totalBytes}` }));
   for (const trackName of tracksName) {
     const videoId = urls[trackName];
-    const { path, fileSize } = await downloadMusic(
+    const { buffer, fileSize, path } = await downloadMusic(
       videoId,
       `${trackName}.mp3`,
       ({ progress }) => {
@@ -140,16 +151,10 @@ app.post("/downloadPlaylist", async (req, res) => {
       }
     );
     downloadedBytes += fileSize;
-    urls[trackName] = path;
+    urls[trackName] = { buffer, path };
   }
   console.log(urls);
-  const totalChunks = {};
-  for (let trackName in urls) {
-    const path = urls[trackName];
-    const buffer = readFileSync(path);
-    totalChunks[trackName] = { buffer, path };
-  }
-  const zipBuffer = await createZipFromBuffers(totalChunks);
+  const zipBuffer = await createZipFromBuffers(urls);
   res.end(zipBuffer);
 });
 
@@ -158,7 +163,8 @@ async function createZipFromBuffers(musicObject) {
 
   // Iterate over each key-value pair in the musicObject
   for (const [trackName, { buffer, path }] of Object.entries(musicObject)) {
-    const title = (await mm.parseFile(path)).common.title;
+    const title = (await mm.parseBuffer(new Uint8Array.from(buffer))).common
+      .title;
     zip.file(`${title || trackName}.mp3`, buffer);
     unlinkSync(path);
   }
