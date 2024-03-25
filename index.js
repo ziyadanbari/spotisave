@@ -163,8 +163,7 @@ async function createZipFromBuffers(musicObject) {
 
   // Iterate over each key-value pair in the musicObject
   for (const [trackName, { buffer, path }] of Object.entries(musicObject)) {
-    const title = (await mm.parseBuffer(new Uint8Array.from(buffer))).common
-      .title;
+    const title = (await mm.parseBuffer(Uint8Array.from(buffer))).common.title;
     zip.file(`${title || trackName}.mp3`, buffer);
     unlinkSync(path);
   }
