@@ -16,15 +16,6 @@ setFfmpegPath(ffmpegPath);
 app.use(cors());
 app.use(express.json());
 
-const YD = new YoutubeMp3Downloader({
-  ffmpegPath: ffmpegPath, // FFmpeg binary location
-  youtubeVideoQuality: "highestaudio", // Desired video quality (default: highestaudio)
-  queueParallelism: 1, // Download parallelism (default: 1)
-  progressTimeout: 500, // Interval in ms for the progress reports (default: 1000)
-  allowWebm: false, // Enable download from WebM sources (default: false)
-  outputPath: "./audios",
-});
-
 async function downloadThumbnail(thumbnailUrl) {
   const response = await fetch(thumbnailUrl);
   return await response.arrayBuffer();
@@ -32,6 +23,14 @@ async function downloadThumbnail(thumbnailUrl) {
 
 async function downloadMusic(videoId, filename, progressCb, thumbnailUrl) {
   try {
+    const YD = new YoutubeMp3Downloader({
+      ffmpegPath: ffmpegPath, // FFmpeg binary location
+      youtubeVideoQuality: "highestaudio", // Desired video quality (default: highestaudio)
+      queueParallelism: 1, // Download parallelism (default: 1)
+      progressTimeout: 500, // Interval in ms for the progress reports (default: 1000)
+      allowWebm: false, // Enable download from WebM sources (default: false)
+      outputPath: "./audios",
+    });
     console.log(videoId);
     console.log(thumbnailUrl);
     return new Promise((resolve, reject) => {
