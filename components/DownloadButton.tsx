@@ -140,7 +140,7 @@ export default function DownloadButton({
         }
         const downloadedBytes = extractDownloadedBytes(decodedChunk);
         if (downloadedBytes) {
-          setProgress(Math.trunc((downloadedBytes / totalLength) * 100));
+          setProgress(downloadedBytes);
           continue;
         }
         if (value instanceof Uint8Array || (value as any) instanceof Array) {
