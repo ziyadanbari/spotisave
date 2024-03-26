@@ -67,7 +67,9 @@ export async function POST(req: Request) {
 }
 
 function extractTrackId(trackUrl: string): string | null {
-  const trackId = trackUrl.match(/track\/([a-zA-Z0-9]{22})/);
+  const trackId = trackUrl.match(
+    /(?:https:\/\/open\.spotify\.com\/track\/|https:\/\/spotify\.link\/)([a-zA-Z0-9]+)/
+  );
   return trackId ? trackId[1] : null;
 }
 
