@@ -1,96 +1,116 @@
 const express = require("express");
 const JSZip = require("jszip");
 const cors = require("cors");
-const { existsSync, readFileSync, unlinkSync, writeFileSync } = require("fs");
+const { unlinkSync, createWriteStream, writeFileSync } = require("fs");
 const mm = require("music-metadata");
 const app = express();
-const YoutubeMp3Downloader = require("youtube-mp3-downloader");
 const NodeID3 = require("node-id3");
 const { YouTube } = require("youtube-sr");
-const { setFfmpegPath } = require("fluent-ffmpeg");
+const ffmpeg = require("fluent-ffmpeg");
 const sharp = require("sharp");
 const ytdl = require("ytdl-core");
+const { PassThrough } = require("stream");
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+const toStream = require("buffer-to-stream");
+const { default: axios } = require("axios");
+
 require("dotenv").config();
-setFfmpegPath(ffmpegPath);
+ffmpeg.setFfmpegPath(ffmpegPath);
+
 app.use(cors());
 app.use(express.json());
+
+const BASE_YOUTUBE_URL = "https://www.youtube.com/watch?v=";
 
 async function downloadThumbnail(thumbnailUrl) {
   const response = await fetch(thumbnailUrl);
   return await response.arrayBuffer();
 }
 
-async function downloadMusic(videoId, filename, progressCb, thumbnailUrl) {
+async function downloadMusic(
+  videoId,
+  thumbnailUrl,
+  dataCb,
+  finishCb,
+  responseCb,
+  res
+) {
   try {
-    const YD = new YoutubeMp3Downloader({
-      ffmpegPath: ffmpegPath, // FFmpeg binary location
-      youtubeVideoQuality: "highestaudio", // Desired video quality (default: highestaudio)
-      queueParallelism: 1, // Download parallelism (default: 1)
-      progressTimeout: 500, // Interval in ms for the progress reports (default: 1000)
-      allowWebm: false, // Enable download from WebM sources (default: false)
-      outputPath: "./audios",
-    });
-    console.log(videoId);
-    console.log(thumbnailUrl);
+    const info = await ytdl.getInfo(`${BASE_YOUTUBE_URL}${videoId}`);
     return new Promise((resolve, reject) => {
-      YD.download(videoId, filename);
-      if (progressCb) YD.on("progress", progressCb);
-      YD.on("finished", async (error, info) => {
-        console.log(info);
-        const thumbnailBufferPNG = await downloadThumbnail(
-          thumbnailUrl || info.thumbnail
-        );
-        const thumbnailBufferJPEG = await sharp(thumbnailBufferPNG)
-          .toFormat("jpeg")
-          .resize(640, 640)
-          .toBuffer();
-        console.log(thumbnailBufferJPEG);
-        NodeID3.write(
-          {
-            image: {
-              imageBuffer: thumbnailBufferJPEG,
-              mime: "image/jpeg",
-              type: { id: 3, name: "front cover" },
+      const stream = ytdl.downloadFromInfo(info, {
+        quality: "lowest",
+        filter: (format) => format.container === "mp4",
+      });
+
+      let totalLength = 0;
+      let downloadedBytes = 0;
+      const thumbnail =
+        info.videoDetails.thumbnails[0].url ||
+        info.videoDetails.thumbnail.thumbnails[0].url;
+      const title = info.videoDetails.title;
+      const author = info.videoDetails.author.name;
+
+      let mergedBuffer = Buffer.alloc(0);
+      stream.on("info", async (info, format) => {
+        const response = await axios.head(format.url);
+        totalLength = response.headers["content-length"];
+        if (responseCb) responseCb(totalLength);
+      });
+      stream.on("data", (chunk) => {
+        mergedBuffer = Buffer.concat([mergedBuffer, chunk]);
+        downloadedBytes += chunk.length;
+        const progress = Math.min(downloadedBytes / totalLength) * 100;
+        if (dataCb) dataCb(progress, chunk.length);
+      });
+      stream.on("end", () => {
+        const streamBuffer = toStream(mergedBuffer);
+        let ffmpegMergedBuffer = Buffer.alloc(0);
+        const outputStream = new PassThrough();
+        let outputOptions = ["-id3v2_version", "4"];
+        const commandFfmpeg = ffmpeg();
+        commandFfmpeg
+          .input(streamBuffer) // Use PassThrough stream as input
+          .audioBitrate(192)
+          .withAudioCodec("libmp3lame")
+          .toFormat("mp3")
+          .outputOptions(...outputOptions)
+          .on("error", (error) => {
+            console.log(error);
+          })
+          .on("", () => {
+            console.log("end");
+          })
+          .pipe(outputStream);
+        outputStream.on("data", (chunk) => {
+          ffmpegMergedBuffer = Buffer.concat([ffmpegMergedBuffer, chunk]);
+        });
+        outputStream.on("finish", async () => {
+          const thumbnailBuffer = await downloadThumbnail(thumbnail);
+          const thumbnailJPEGBuffer = await sharp(thumbnailBuffer)
+            .toFormat("jpeg")
+            .resize(640, 640)
+            .toBuffer();
+          const audioBuffer = NodeID3.write(
+            {
+              image: {
+                type: { id: 3 },
+                imageBuffer: thumbnailJPEGBuffer,
+              },
+              title,
+              artist: author,
             },
-          },
-          readFileSync(info.file),
-          (err, buffer) => {
-            writeFileSync(info.file, buffer);
-            const fileBuffer = readFileSync(info.file);
-            resolve({
-              buffer: fileBuffer,
-              fileSize: info.stats.transferredBytes,
-              path: info.file,
-              url: `${process.env.BACKEND_URI}/getSong/${info.file.split("/").slice(-1)[0]}`,
-            });
-          }
-        );
+            ffmpegMergedBuffer
+          );
+          if (finishCb) finishCb(audioBuffer);
+          resolve({ fileSize: totalLength, buffer: audioBuffer });
+        });
       });
     });
   } catch (error) {
-    console.log(error);
     throw error;
   }
 }
-
-app.get(`/getSong/:musicId`, async (req, res) => {
-  try {
-    const { musicId } = req.params;
-    console.log(musicId);
-    const musicDir = `./audios/${musicId}`;
-    console.log(musicDir);
-    const isExist = existsSync(musicDir);
-    if (!isExist) throw [404, "Music not found"];
-    const buffer = readFileSync(musicDir);
-    res.setHeader("Content-Type", "audio/mp3");
-    res.send(buffer);
-    unlinkSync(musicDir);
-  } catch (error) {
-    console.log(error);
-    res.status(error[0] || 500).json({ message: error.toString() });
-  }
-});
 
 // Route to stream audio
 app.get("/getMusic", async (req, res) => {
@@ -99,16 +119,16 @@ app.get("/getMusic", async (req, res) => {
     if (!name) return res.status(400).json({ message: "Track id is missing" });
     const search = await YouTube.searchOne(name);
     const trackId = search.id;
-    const { buffer, fileSize, url } = await downloadMusic(
+    await downloadMusic(
       trackId,
-      `${name}.mp3`,
-      ({ progress }) => {
-        res.write(JSON.stringify({ totalBytes: `${progress.length}` }));
-        res.write(JSON.stringify({ downloadedBytes: progress.percentage }));
+      thumbnailUrl,
+      (percent) => res.write(JSON.stringify({ downloadedBytes: percent })),
+      (buffer) => {
+        res.end(buffer);
       },
-      thumbnailUrl
+      (totalBytes) => res.write(JSON.stringify({ totalBytes })),
+      res
     );
-    return res.end(JSON.stringify({ url }));
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ message: error.toString() });
@@ -124,35 +144,35 @@ app.post("/downloadPlaylist", async (req, res) => {
     tracksName.map(async (trackName) => {
       const search = await YouTube.searchOne(trackName);
       const info = await ytdl.getInfo(search.url);
-      const audioLength = ytdl.chooseFormat(info.formats, {
-        filter: "audioonly",
-        quality: "highestaudio",
-      }).contentLength;
-      totalBytes += parseInt(audioLength);
-      const videoId = search.id;
-      urls[trackName] = videoId;
+      const format = ytdl.chooseFormat(info.formats, {
+        quality: "lowest",
+        filter: (format) => format.container === "mp4",
+      });
+      const response = await axios.head(format.url);
+      totalBytes += parseInt(response.headers["content-length"]);
+      urls[trackName] = search.id;
     })
   );
+  console.log(totalBytes);
   res.write(JSON.stringify({ totalBytes: `${totalBytes}` }));
   for (const trackName of tracksName) {
     const videoId = urls[trackName];
-    const { buffer, fileSize, path } = await downloadMusic(
+    const { buffer, fileSize } = await downloadMusic(
       videoId,
       `${trackName}.mp3`,
-      ({ progress }) => {
-        res.write(
-          JSON.stringify({
-            downloadedBytes: Math.min(
-              ((downloadedBytes + progress.transferred) / totalBytes) * 100
-            ),
-          })
-        );
-      }
+      (p, currentDownloadedBytes) => {
+        if (currentDownloadedBytes) {
+          console.log(currentDownloadedBytes);
+          downloadedBytes += currentDownloadedBytes;
+          console.log(downloadedBytes);
+          const progress = Math.min((downloadedBytes / totalBytes) * 100);
+          res.write(JSON.stringify({ downloadedBytes: progress }));
+        }
+      },
+      null
     );
-    downloadedBytes += fileSize;
-    urls[trackName] = { buffer, path };
+    urls[trackName] = { buffer };
   }
-  console.log(urls);
   const zipBuffer = await createZipFromBuffers(urls);
   res.end(zipBuffer);
 });
@@ -161,10 +181,9 @@ async function createZipFromBuffers(musicObject) {
   const zip = new JSZip();
 
   // Iterate over each key-value pair in the musicObject
-  for (const [trackName, { buffer, path }] of Object.entries(musicObject)) {
+  for (const [trackName, { buffer }] of Object.entries(musicObject)) {
     const title = (await mm.parseBuffer(Uint8Array.from(buffer))).common.title;
     zip.file(`${title || trackName}.mp3`, buffer);
-    unlinkSync(path);
   }
 
   // Generate the zip buffer
