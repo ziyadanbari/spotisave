@@ -17,7 +17,11 @@ const { default: axios } = require("axios");
 require("dotenv").config();
 ffmpeg.setFfmpegPath(ffmpegPath);
 
-app.use(cors());
+app.use(
+  cors({
+    origin: ["https://spotisave.vercel.app/"],
+  })
+);
 app.use(express.json());
 
 const BASE_YOUTUBE_URL = "https://www.youtube.com/watch?v=";
