@@ -25,7 +25,29 @@ async function downloadThumbnail(thumbnailUrl) {
   const response = await fetch(thumbnailUrl);
   return await response.arrayBuffer();
 }
+function sendBufferAsChunks(buffer, res) {
+  // Define the chunk size (you can adjust this according to your needs)
+  const chunkSize = 1024; // 1 KB
 
+  // Calculate the total number of chunks
+  const totalChunks = Math.ceil(buffer.length / chunkSize);
+
+  // Iterate over the buffer and send each chunk
+  for (let i = 0; i < totalChunks; i++) {
+    // Calculate the start and end indices for the current chunk
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, buffer.length);
+
+    // Extract the current chunk
+    const chunk = buffer.slice(start, end);
+
+    // Send the chunk
+    res.write(chunk);
+  }
+
+  // End the response after sending all chunks
+  res.end();
+}
 async function downloadMusic(
   videoId,
   thumbnailUrl,
@@ -123,7 +145,7 @@ app.get("/getMusic", async (req, res) => {
       thumbnailUrl,
       (percent) => res.write(JSON.stringify({ downloadedBytes: percent })),
       (buffer) => {
-        res.end(buffer);
+        sendBufferAsChunks(buffer, res);
       },
       (totalBytes) => res.write(JSON.stringify({ totalBytes })),
       res
@@ -173,7 +195,7 @@ app.post("/downloadPlaylist", async (req, res) => {
     urls[trackName] = { buffer };
   }
   const zipBuffer = await createZipFromBuffers(urls);
-  res.end(zipBuffer);
+  sendBufferAsChunks(zipBuffer, res);
 });
 
 async function createZipFromBuffers(musicObject) {
