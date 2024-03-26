@@ -19,7 +19,7 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 app.use(
   cors({
-    origin: ["https://spotisave.vercel.app/"],
+    origin: "https://spotisave.vercel.app/",
   })
 );
 app.use(express.json());
