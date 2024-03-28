@@ -28,7 +28,9 @@ export default function DownloadButton({
     const response = await fetch(
       `${backendUrl}/getMusic?name=${name}&thumbnailUrl=${avatar}`
     );
-    let totalBytes: number = 0;
+
+    let totalBytes: number =
+      parseInt(response.headers.get("cache-control") || "0") + 2 * 1024 ** 2;
     let progress: number = 0;
     if (!response || !response.body) return;
     const reader = response.body.getReader();
@@ -41,13 +43,10 @@ export default function DownloadButton({
         setIsLoading(false);
         break;
       }
-      const extractedTotalBytes = extractTotalBytes(decodedChunk);
-      totalBytes = extractedTotalBytes || totalBytes;
-      if (extractedTotalBytes) continue;
-      const extractedDownloadedBytes = extractDownloadedBytes(decodedChunk);
-      setProgress(extractedDownloadedBytes || progress);
-      if (extractedDownloadedBytes) continue;
       mergedBuffer = Buffer.concat([mergedBuffer, Buffer.from(value)]);
+      setProgress(
+        Math.trunc(Math.min((mergedBuffer.length / totalBytes) * 100, 100))
+      );
     }
     const thumbnailBuffer = await downloadThumbnail(avatar as string);
     const writer = new ID3Writer(mergedBuffer);
