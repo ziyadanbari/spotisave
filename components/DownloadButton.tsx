@@ -30,7 +30,7 @@ export default function DownloadButton({
     );
 
     let totalBytes: number =
-      parseInt(response.headers.get("cache-control") || "0") + 2 * 1024 ** 2;
+      parseInt(response.headers.get("cache-control") || "0") + 0.8 * 1024 ** 2;
     let progress: number = 0;
     if (!response || !response.body) return;
     const reader = response.body.getReader();
