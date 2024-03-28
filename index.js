@@ -12,6 +12,7 @@ const { PassThrough } = require("stream");
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
 const toStream = require("buffer-to-stream");
 const { default: axios } = require("axios");
+const { writeFileSync } = require("fs");
 
 require("dotenv").config();
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -54,16 +55,17 @@ async function downloadMusic(
   dataCb,
   finishCb,
   responseCb,
-  res
+  res,
+  ID3Merge
 ) {
   try {
+    console.log(ID3Merge);
     const info = await ytdl.getInfo(`${BASE_YOUTUBE_URL}${videoId}`);
     return new Promise((resolve, reject) => {
       const stream = ytdl.downloadFromInfo(info, {
-        quality: "lowest",
-        filter: (format) => format.container === "mp4",
+        quality: "highest",
+        filter: (format) => format.hasAudio && format.container === "mp4",
       });
-
       let totalLength = 0;
       let downloadedBytes = 0;
       const thumbnail =
@@ -71,45 +73,36 @@ async function downloadMusic(
         info.videoDetails.thumbnail.thumbnails[0].url;
       const title = info.videoDetails.title;
       const author = info.videoDetails.author.name;
-
-      let mergedBuffer = Buffer.alloc(0);
       stream.on("info", async (info, format) => {
         const response = await axios.head(format.url);
+        console.log(format.url);
         totalLength = response.headers["content-length"];
         if (responseCb) responseCb(totalLength);
       });
-      stream.on("data", (chunk) => {
-        mergedBuffer = Buffer.concat([mergedBuffer, chunk]);
+      let ffmpegMergedBuffer = Buffer.alloc(0);
+      const outputStream = new PassThrough();
+      let outputOptions = ["-id3v2_version", "4"];
+      const commandFfmpeg = ffmpeg();
+      commandFfmpeg
+        .input(stream)
+        .audioBitrate(192)
+        .withAudioCodec("libmp3lame")
+        .toFormat("mp3")
+        .outputOptions(...outputOptions)
+        .on("error", (error) => {
+          console.log(error);
+        })
+        .pipe(outputStream);
+      outputStream.on("data", (chunk) => {
+        ffmpegMergedBuffer = Buffer.concat([ffmpegMergedBuffer, chunk]);
         downloadedBytes += chunk.length;
         const progress = Math.min(downloadedBytes / totalLength) * 100;
-        if (dataCb) dataCb(progress, chunk.length);
+        if (dataCb) dataCb(progress, chunk.length, chunk);
       });
-      stream.on("end", () => {
-        const streamBuffer = toStream(mergedBuffer);
-        let ffmpegMergedBuffer = Buffer.alloc(0);
-        const outputStream = new PassThrough();
-        let outputOptions = ["-id3v2_version", "4"];
-        const commandFfmpeg = ffmpeg();
-        commandFfmpeg
-          .input(streamBuffer) // Use PassThrough stream as input
-          .audioBitrate(192)
-          .withAudioCodec("libmp3lame")
-          .toFormat("mp3")
-          .outputOptions(...outputOptions)
-          .on("error", (error) => {
-            console.log(error);
-          })
-          .on("", () => {
-            console.log("end");
-          })
-          .pipe(outputStream);
-        outputStream.on("data", (chunk) => {
-          ffmpegMergedBuffer = Buffer.concat([ffmpegMergedBuffer, chunk]);
-        });
-        outputStream.on("finish", async () => {
+      outputStream.on("finish", async () => {
+        if (ID3Merge) {
           const thumbnailBuffer = await downloadThumbnail(thumbnail);
           const thumbnailJPEGBuffer = await sharp(thumbnailBuffer)
-            .toFormat("jpeg")
             .resize(640, 640)
             .toBuffer();
           const audioBuffer = NodeID3.write(
@@ -125,10 +118,15 @@ async function downloadMusic(
           );
           if (finishCb) finishCb(audioBuffer);
           resolve({ fileSize: totalLength, buffer: audioBuffer });
-        });
+        } else {
+          console.log(ffmpegMergedBuffer.length);
+          if (finishCb) finishCb(ffmpegMergedBuffer);
+          resolve({ fileSize: totalLength, buffer: ffmpegMergedBuffer });
+        }
       });
     });
   } catch (error) {
+    console.log(error);
     throw error;
   }
 }
@@ -143,11 +141,17 @@ app.get("/getMusic", async (req, res) => {
     await downloadMusic(
       trackId,
       thumbnailUrl,
-      (percent) => res.write(JSON.stringify({ downloadedBytes: percent })),
-      (buffer) => {
-        sendBufferAsChunks(buffer, res);
+      (percent, chunkLength, chunk) => {
+        res.write(chunk);
       },
-      (totalBytes) => res.write(JSON.stringify({ totalBytes })),
+      (buffer) => {
+        console.log("end");
+        res.end();
+      },
+      (totalBytes) => {
+        console.log(totalBytes);
+        res.set("Cache-Control", String(totalBytes));
+      },
       res
     );
   } catch (error) {
@@ -174,13 +178,12 @@ app.post("/downloadPlaylist", async (req, res) => {
       urls[trackName] = search.id;
     })
   );
-  console.log(totalBytes);
   res.write(JSON.stringify({ totalBytes: `${totalBytes}` }));
   for (const trackName of tracksName) {
     const videoId = urls[trackName];
     const { buffer, fileSize } = await downloadMusic(
       videoId,
-      `${trackName}.mp3`,
+      null,
       (p, currentDownloadedBytes) => {
         if (currentDownloadedBytes) {
           console.log(currentDownloadedBytes);
@@ -190,7 +193,10 @@ app.post("/downloadPlaylist", async (req, res) => {
           res.write(JSON.stringify({ downloadedBytes: progress }));
         }
       },
-      null
+      null,
+      null,
+      null,
+      true
     );
     urls[trackName] = { buffer };
   }
