@@ -2,8 +2,8 @@ import axios from "axios";
 import SpotifyWebApi from "spotify-web-api-node";
 import NodeCache from "node-cache";
 const spotifyApi = new SpotifyWebApi({
-  clientId: "e77fa00b3d2440e89d66fc7f40369cf5",
-  clientSecret: "f27ea124f4254cbfa71e1adef21cd051",
+  clientId: process.env.SPOTIFY_CLIENT_ID,
+  clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
 });
 
 const SearchCache = new NodeCache({ stdTTL: 4 * 3600, maxKeys: 40 });
